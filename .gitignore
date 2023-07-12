@@ -1,0 +1,8 @@
+# Ignore the node_modules directory
+node_modules/
+
+# Ignore the lambda-Function.zip file
+lambda-Function.zip
+
+# Ignore the .DS_Store file
+.DS_Store

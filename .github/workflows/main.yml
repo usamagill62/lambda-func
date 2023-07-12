@@ -1,0 +1,62 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - staging
+      - production
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: 18
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Zip files
+        run: |
+          if [[ ${{ github.ref }} == 'refs/heads/production' ]]; then
+            zip -r production_function.zip .
+          else 
+            zip -r staging_function.zip .
+          fi
+
+      - name: Delete existing file from S3
+        run: |
+          if [[ ${{ github.ref }} == 'refs/heads/production' ]]; then
+            aws s3 rm s3://getprotocolsandfindoptimalpath/production_function.zip
+          else 
+            aws s3 rm s3://getprotocolsandfindoptimalpath/staging_function.zip
+          fi
+
+      - name: Upload new file to S3
+        run: |
+          if [[ ${{ github.ref }} == 'refs/heads/production' ]]; then
+            aws s3 cp production_function.zip s3://getprotocolsandfindoptimalpath/
+          else
+            aws s3 cp staging_function.zip s3://getprotocolsandfindoptimalpath/
+          fi
+
+      - name: Update Lambda function code
+        run: |
+          if [[ ${{ github.ref }} == 'refs/heads/production' ]]; then
+            aws lambda update-function-code --function-name aggregatorAPI --s3-bucket getprotocolsandfindoptimalpath --s3-key production_function.zip
+          else
+            aws lambda update-function-code --function-name stagingAggregatorAPI --s3-bucket getprotocolsandfindoptimalpath --s3-key staging_function.zip
+          fi
